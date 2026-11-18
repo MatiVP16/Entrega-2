@@ -1,0 +1,157 @@
+---
+title: "Modelo 2"
+output: html_document
+date: "2026-11-16"
+---
+```{r}
+library(dplyr)
+library(readxl)
+library(modelsummary)
+library(sjPlot)
+library(ggplot2)
+```
+
+#Ver cómo afecta el sexo en la confianza
+
+```{r}
+cep_sexo <- cep |>
+  mutate(
+    confianza_alta = case_when(
+      confianza_evang %in% c("Bastante", "Mucha") ~ 1,
+      confianza_evang %in% c("Nada", "Poca") ~ 0,
+      TRUE ~ NA_real_
+    )
+  ) |>
+  filter(
+    !is.na(confianza_alta),
+    !is.na(sexo_cat)
+  )
+```
+# Estimación del modelo logístico de confianza alta según sexo
+```{r}
+modelo_sexo <- glm(
+  confianza_alta ~ sexo_cat,
+  data = cep_sexo,
+  family = "binomial"
+)
+
+summary(modelo_sexo)
+```
+#Calculo de probabilidades Hombre y Mujer 
+```{r}
+nuevos_sexos <- data.frame(
+  sexo_cat = factor(
+    c("Hombre", "Mujer"),
+    levels = levels(cep_sexo$sexo_cat)
+  )
+)
+
+pred_sexo <- predict(
+  modelo_sexo,
+  newdata = nuevos_sexos,
+  type = "link",
+  se.fit = TRUE
+)
+
+tabla_prob_sexo <- tibble::tibble(
+  Sexo = nuevos_sexos$sexo_cat,
+
+  `Probabilidad (%)` = round(
+    100 * plogis(pred_sexo$fit), 1
+  ),
+
+  `Límite inferior (%)` = round(
+    100 * plogis(
+      pred_sexo$fit - qnorm(0.975) * pred_sexo$se.fit
+    ), 1
+  ),
+
+  `Límite superior (%)` = round(
+    100 * plogis(
+      pred_sexo$fit + qnorm(0.975) * pred_sexo$se.fit
+    ), 1
+  )
+)
+```
+
+#Tabla  de hombres:
+```{r}
+tabla_hombres <- tabla_prob_sexo |>
+  dplyr::filter(Sexo == "Hombre") |>
+  gt::gt() |>
+  gt::tab_header(
+    title = "Hombres: probabilidad de confianza alta",
+    subtitle = "Intervalo de confianza del 95 %. Análisis sin ponderar."
+  )
+
+tabla_hombres
+```
+#tabla de mujeres:
+```{r}
+tabla_mujeres <- tabla_prob_sexo |>
+  dplyr::filter(Sexo == "Mujer") |>
+  gt::gt() |>
+  gt::tab_header(
+    title = "Mujeres: probabilidad de confianza alta",
+    subtitle = "Intervalo de confianza del 95 %. Análisis sin ponderar."
+  )
+
+tabla_mujeres
+```
+#Grafico hombre y mujer 
+
+```{r}
+library(ggplot2)
+
+grafico_sexo_ggplot <- ggplot(
+  tabla_prob_sexo,
+  aes(
+    x = Sexo,
+    y = `Probabilidad (%)`,
+    colour = Sexo
+  )
+) +
+  geom_errorbar(
+    aes(
+      ymin = `Límite inferior (%)`,
+      ymax = `Límite superior (%)`
+    ),
+    width = 0.12,
+    linewidth = 0.8
+  ) +
+  geom_point(size = 3.5) +
+  geom_text(
+    aes(label = paste0(`Probabilidad (%)`, "%")),
+    nudge_x = 0.12,
+    hjust = 0,
+    size = 4,
+    show.legend = FALSE
+  ) +
+  scale_colour_manual(
+    values = c(
+      "Hombre" = "#146B80",
+      "Mujer" = "#A65F3A"
+    )
+  ) +
+  scale_y_continuous(
+    labels = scales::label_percent(scale = 1, accuracy = 1)
+  ) +
+  labs(
+    title = "Confianza en las iglesias evangélicas según sexo",
+    subtitle = "Probabilidad de declarar bastante o mucha confianza",
+    x = "Sexo",
+    y = "Probabilidad predicha",
+    caption = "CEP 91, 2024. Análisis sin ponderar. IC del 95 %."
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    panel.grid.major.x = element_blank()
+  )
+
+grafico_sexo_ggplot
+```
+
+
+
+

@@ -1,0 +1,77 @@
+---
+title: "CEP 91"
+output: html_document
+date: "2026-11-14"
+---
+```{r}
+library(dplyr)
+library(readxl)
+library(modelsummary)
+library(sjPlot)
+library(ggplot2)
+```
+
+```{r}
+cep <- read_excel("base_91.xlsx")
+```
+
+```{r}
+head(cep)
+names(cep)
+```
+
+
+```{r}
+
+cep <- cep %>%
+  mutate(
+    confianza_evang = factor(confianza_6_b, 
+                             levels = c(4, 3, 2, 1), 
+                             labels = c("Nada", "Poca", "Bastante", "Mucha"), 
+                             ordered = TRUE),
+    
+    narco_bin = case_when(
+      seguridad_45 == 2 ~ 0,
+      seguridad_45 == 1 ~ 1,
+      TRUE ~ NA_real_
+    ) %>% factor(levels = c(0, 1), labels = c("No", "Sí")),
+    
+    narco_3cat = factor(seguridad_45, 
+                        levels = c(2, 1, -8), 
+                        labels = c("No", "Sí", "No sabe")),
+    
+    religion_cat = case_when(
+      religion_82 == 1 ~ "Católica",
+      religion_82 == 2 ~ "Evangélica",
+      religion_82 %in% 3:8 ~ "Otra religión",
+      religion_82 %in% 9:11 ~ "Sin religión/Ateo/Agnóstico",
+      TRUE ~ NA_character_
+    ) %>% factor(levels = c("Católica", "Evangélica", "Otra religión", "Sin religión/Ateo/Agnóstico")),
+    
+    edad_limpia = ifelse(edad < 0, NA, edad),
+    sexo_cat = factor(sexo, levels = c(1, 2), labels = c("Hombre", "Mujer")),
+    educ_cat = case_when(
+      esc_nivel_1_c %in% 0:2 ~ "Básica o menos",
+      esc_nivel_1_c %in% 3:4 ~ "Media",
+      esc_nivel_1_c %in% 5:10 ~ "Superior",
+      TRUE ~ NA_character_
+    ) %>% factor(levels = c("Básica o menos", "Media", "Superior")),
+    
+    zona_cat = factor(zona_u_r, levels = c(1, 2), labels = c("Urbana", "Rural"))
+  )
+
+```
+
+```{r}
+cep <- cep %>%
+  select(confianza_evang, narco_bin, narco_3cat, 
+         religion_cat, edad_limpia, sexo_cat, 
+         educ_cat, zona_cat, pond, estrato, secu)
+```
+
+```{r}
+cep <- cep %>%
+  select(confianza_evang, narco_bin, narco_3cat, 
+         religion_cat, edad_limpia, sexo_cat, 
+         educ_cat, zona_cat)
+```

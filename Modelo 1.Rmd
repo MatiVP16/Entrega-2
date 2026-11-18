@@ -1,0 +1,97 @@
+---
+title: "CEP 91"
+output: html_document
+date: "2026-11-14"
+---
+```{r}
+library(dplyr)
+library(readxl)
+library(modelsummary)
+library(sjPlot)
+library(ggplot2)
+```
+
+#ver como afecta la edad en la confianza 
+
+```{r}
+cep_edad <- cep |>
+  mutate(
+    confianza_alta = case_when(
+      confianza_evang %in% c("Bastante", "Mucha") ~ 1,
+      confianza_evang %in% c("Nada", "Poca") ~ 0,
+      TRUE ~ NA_real_
+    )
+  ) |>
+  filter(
+    !is.na(confianza_alta),
+    !is.na(edad_limpia)
+  )
+```
+
+#Revisar cuantos casos se utilizan 
+```{r}
+c(
+  n_total = nrow(cep),
+  n_analizados = nrow(cep_edad)
+)
+```
+
+#Logit Binario
+
+```{r}
+modelo_edad <- glm(
+  confianza_alta ~ edad_limpia,
+  data = cep_edad,
+  family = "binomial"
+)
+
+summary(modelo_edad)
+```
+
+#Odds Ratios 
+```{r}
+modelsummary(
+  modelo_edad,
+  exponentiate = TRUE,
+  statistic = "conf.int",
+  coef_map = c(
+    "(Intercept)" = "Intercepto",
+    "edad_limpia" = "Edad (años)"
+  ),
+  gof_map = "nobs",
+  stars = TRUE,
+  output = "gt"
+)
+```
+
+#Interpretación:
+El modelo muestra una asociación positiva entre la edad y la confianza alta en las iglesias evangélicas, con un cambio pequeño por cada año adicional.
+
+
+#Grafica probabilidades predichas
+```{r}
+range(cep_edad$edad_limpia, na.rm = TRUE)
+
+grafico_edad <- sjPlot::plot_model(
+  modelo_edad,
+  type = "pred",
+  terms = "edad_limpia [all]",
+  ci.lvl = 0.95
+) +
+  labs(
+    title = "Edad y confianza en las iglesias evangélicas",
+    x = "Edad (años)",
+    y = "Probabilidad de declarar bastante o mucha confianza",
+    caption = "Análisis sin ponderar. IC puntuales del 95 %."
+  ) +
+  scale_y_continuous(
+    labels = scales::label_percent(accuracy = 1)
+  ) +
+  theme_minimal()
+
+grafico_edad
+```
+#La probabilidad estimada de confianza alta pasa de aproximadamente 21 % a los 20 años a 29 % a los 80 años, una diferencia cercana a 8 % La franja rosada se amplía en las edades más avanzadas, indicando mayor incertidumbre en esas estimaciones.
+
+
+
